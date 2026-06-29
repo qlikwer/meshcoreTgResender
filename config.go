@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 
@@ -16,8 +17,10 @@ type Config struct {
 }
 
 func LoadConfig() (*Config, error) {
+	// .env не обязателен: переменные могут быть заданы окружением
+	// (Docker/systemd и т.п.), поэтому ошибку только логируем.
 	if err := godotenv.Load(); err != nil {
-		return nil, fmt.Errorf("loading .env: %w", err)
+		log.Printf("warning: .env не загружен (%v), использую переменные окружения", err)
 	}
 
 	cfg := &Config{}

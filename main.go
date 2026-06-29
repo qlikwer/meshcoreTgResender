@@ -4,6 +4,7 @@ import (
 	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
+	"time"
 )
 
 // Message represents the structure of incoming WebSocket messages
@@ -36,17 +37,32 @@ type Message struct {
 	TsObserver           string  `json:"ts_observer"`
 }
 
+// connect устанавливает WebSocket-соединение и держит его, переподключаясь
+// при ошибке подключения или разрыве канала.
+func connect(headers http.Header, publicAgg *PublicAggregator, pingAgg *PingAggregator) {
+	for {
+		dialer := websocket.DefaultDialer
+		conn, _, err := dialer.Dial(
+			"wss://www.meshcoretel.ru/ws/packets?region_code=MQF",
+			headers,
+		)
+
+		if err != nil {
+			log.Printf("Ошибка подключения: %v. Повтор через 10 секунд", err)
+			time.Sleep(10 * time.Second)
+			continue
+		}
+
+		log.Println("Подключено")
+		err = readLoop(conn, publicAgg, pingAgg)
+		conn.Close()
+
+		log.Printf("Соединение потеряно: %v. Переподключение через 5 секунд", err)
+		time.Sleep(5 * time.Second)
+	}
+}
+
 func main() {
-	headers := http.Header{}
-
-	headers.Set("User-Agent", "Mozilla/5.0")
-
-	dialer := websocket.DefaultDialer
-	conn, _, err := dialer.Dial(
-		"wss://www.meshcoretel.ru/ws/packets?region_code=MQF",
-		headers,
-	)
-
 	cfg, err := LoadConfig()
 	if err != nil {
 		log.Fatal("config error:", err)
@@ -56,14 +72,8 @@ func main() {
 	pingAggregator := NewPingAggregator(cfg, sender)
 	publicAggregator := NewPublicAggregator(cfg, sender)
 
-	if err != nil {
-		log.Fatal("ws connect error:", err)
-	}
-	defer conn.Close()
+	headers := http.Header{}
+	headers.Set("User-Agent", "Mozilla/5.0")
 
-	// 5. Start loop
-	err = readLoop(conn, publicAggregator, pingAggregator)
-	if err != nil {
-		log.Fatal("read loop error:", err)
-	}
+	connect(headers, publicAggregator, pingAggregator)
 }

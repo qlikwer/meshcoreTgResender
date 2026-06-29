@@ -22,7 +22,7 @@ func readLoop(
 		if err := json.Unmarshal(message, &msg); err != nil {
 			continue
 		}
-
+		log.Printf("unknown channel %s: %s", msg.ChannelName, msg.Message)
 		switch msg.ChannelName {
 
 		case "#ping":

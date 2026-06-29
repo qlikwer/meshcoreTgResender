@@ -126,8 +126,10 @@ func (a *PingAggregator) Add(msg Message) {
 	// всегда сохраняем последнее состояние сообщения
 	p.Msg = msg
 
-	// ключ дедупликации маршрута
-	key := fmt.Sprintf("%s|%.2f", msg.DisplayCombinedPath, msg.Snr)
+	// ключ дедупликации маршрута: по самому пути, а не по SNR
+	// (SNR одного и того же физического маршрута слегка дрожит от пакета
+	// к пакету, поэтому раньше один маршрут считался "разными").
+	key := msg.DisplayCombinedPath
 
 	p.Routes[key] = PingRoute{
 		Path: msg.DisplayCombinedPath,
