@@ -35,6 +35,7 @@ func (s *TelegramSender) send(text string, threadID int64) error {
 	data := url.Values{}
 	data.Set("chat_id", fmt.Sprintf("%d", s.cfg.ChatID))
 	data.Set("text", text)
+	data.Set("parse_mode", "HTML")
 	data.Set("disable_web_page_preview", "true")
 
 	// thread (topics in supergroup)
@@ -78,16 +79,17 @@ func (s *TelegramSender) SendPing(text string) {
 }
 
 //
-// ===== OPTIONAL HELPERS =====
+// ===== HELPERS =====
 //
 
-// если захочешь потом расширить форматирование
-func escapeTelegram(text string) string {
+// htmlEscape экранирует текст для отправки с parse_mode=HTML. Обязателен
+// для любых динамических данных (имя отправителя, текст сообщения), иначе
+// символы <, >, & могут сломать разметку и Telegram вернёт 400 Bad Request.
+func htmlEscape(text string) string {
 	replacer := strings.NewReplacer(
-		"_", "\\_",
-		"*", "\\*",
-		"[", "\\[",
-		"`", "\\`",
+		"&", "&amp;",
+		"<", "&lt;",
+		">", "&gt;",
 	)
 	return replacer.Replace(text)
 }

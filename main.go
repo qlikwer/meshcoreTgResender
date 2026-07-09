@@ -2,6 +2,7 @@ package main
 
 import (
 	"github.com/gorilla/websocket"
+	"io"
 	"log"
 	"net/http"
 	"time"
@@ -42,13 +43,19 @@ type Message struct {
 func connect(headers http.Header, publicAgg *PublicAggregator, pingAgg *PingAggregator) {
 	for {
 		dialer := websocket.DefaultDialer
-		conn, _, err := dialer.Dial(
-			"wss://www.meshcoretel.ru/ws/packets?region_code=MQF",
+		conn, resp, err := dialer.Dial(
+			"wss://meshcoretel.ru/ws/packets?region_code=MQF",
 			headers,
 		)
 
 		if err != nil {
-			log.Printf("Ошибка подключения: %v. Повтор через 10 секунд", err)
+			if resp != nil {
+				body, _ := io.ReadAll(resp.Body)
+				resp.Body.Close()
+				log.Printf("Ошибка подключения: %v (статус: %s, Location: %s, тело: %s). Повтор через 10 секунд", err, resp.Status, resp.Header.Get("Location"), body)
+			} else {
+				log.Printf("Ошибка подключения: %v. Повтор через 10 секунд", err)
+			}
 			time.Sleep(10 * time.Second)
 			continue
 		}

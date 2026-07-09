@@ -53,7 +53,7 @@ func (a *PublicAggregator) Add(msg Message) {
 		p.Timer.Stop()
 	}
 
-	p.Timer = time.AfterFunc(2*time.Second, func() {
+	p.Timer = time.AfterFunc(10*time.Second, func() {
 		a.flush(h)
 	})
 }
@@ -70,8 +70,8 @@ func (a *PublicAggregator) flush(hash string) {
 
 	text := fmt.Sprintf(
 		"From %s:\n%s",
-		p.Msg.SenderName,
-		p.Msg.Message,
+		htmlEscape(p.Msg.SenderName),
+		htmlEscape(p.Msg.Message),
 	)
 
 	a.sender.SendPublic(text)
@@ -89,7 +89,11 @@ type PingRoute struct {
 type PingEntry struct {
 	Msg    Message
 	Routes map[string]PingRoute
-	Timer  *time.Timer
+	// RouteOrder хранит уникальные display_combined_path в порядке первого
+	// появления — нужен для построения дерева маршрутов (порядок влияет на
+	// то, в каком порядке отображаются ветки одного уровня).
+	RouteOrder []string
+	Timer      *time.Timer
 }
 
 type PingAggregator struct {
@@ -131,6 +135,10 @@ func (a *PingAggregator) Add(msg Message) {
 	// к пакету, поэтому раньше один маршрут считался "разными").
 	key := msg.DisplayCombinedPath
 
+	if _, exists := p.Routes[key]; !exists {
+		p.RouteOrder = append(p.RouteOrder, key)
+	}
+
 	p.Routes[key] = PingRoute{
 		Path: msg.DisplayCombinedPath,
 		SNR:  msg.Snr,
@@ -158,21 +166,15 @@ func (a *PingAggregator) flush(hash string) {
 	var b strings.Builder
 
 	b.WriteString("📡 PING\n\n")
-	b.WriteString(fmt.Sprintf("From: %s\n\n", p.Msg.SenderName))
+	b.WriteString(fmt.Sprintf("From: %s\n\n", htmlEscape(p.Msg.SenderName)))
 	b.WriteString("Message:\n")
-	b.WriteString(p.Msg.Message)
+	b.WriteString(htmlEscape(p.Msg.Message))
 	b.WriteString("\n\nRoutes:\n")
-
-	i := 1
-	for _, r := range p.Routes {
-		b.WriteString(fmt.Sprintf(
-			"%d) SNR: %.1f\n%s\n\n",
-			i,
-			r.SNR,
-			strings.ReplaceAll(r.Path, "NA → ", ""),
-		))
-		i++
-	}
+	b.WriteString("<pre>")
+	// имя отправителя экранируем до построения дерева, чтобы ширина
+	// выравнивания считалась по итоговой (уже экранированной) строке
+	b.WriteString(RenderRouteTree(htmlEscape(p.Msg.SenderName), p.RouteOrder))
+	b.WriteString("</pre>")
 
 	a.sender.SendPing(b.String())
 }

@@ -18,14 +18,19 @@ func readLoop(
 			return err
 		}
 
+		log.Printf("raw message: %s", message)
+
 		var msg Message
 		if err := json.Unmarshal(message, &msg); err != nil {
+			log.Printf("unmarshal error: %v (raw: %s)", err, message)
 			continue
 		}
-		log.Printf("unknown channel %s: %s", msg.ChannelName, msg.Message)
+
+		log.Printf("parsed message: %+v", msg)
+
 		switch msg.ChannelName {
 
-		case "#ping":
+		case "#ping", "Пинги":
 			pingAgg.Add(msg)
 
 		case "Public", "Test":
@@ -33,7 +38,7 @@ func readLoop(
 
 		default:
 			// можно логировать, но не слать в Telegram сразу
-			log.Printf("unknown channel %s: %s", msg.ChannelName, msg.Message)
+			log.Printf("unknown channel %q: %q", msg.ChannelName, msg.Message)
 		}
 	}
 }
